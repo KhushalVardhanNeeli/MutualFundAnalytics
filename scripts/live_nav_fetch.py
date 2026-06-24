@@ -1,9 +1,11 @@
+import os
 import requests
 import pandas as pd
-import os
 
-os.makedirs("data/raw", exist_ok=True)
+# Create API folder if it doesn't exist
+os.makedirs("data/raw/api", exist_ok=True)
 
+# Dictionary of schemes and their AMFI codes
 schemes = {
     "HDFC_Top100": "125497",
     "SBI_Bluechip": "119551",
@@ -13,19 +15,36 @@ schemes = {
     "Kotak_Bluechip": "120841"
 }
 
-for name, code in schemes.items():
-    url = f"https://api.mfapi.in/mf/{code}"
+print("=" * 70)
+print("FETCHING LIVE NAV DATA FROM MFAPI")
+print("=" * 70)
 
-    response = requests.get(url)
+for scheme_name, amfi_code in schemes.items():
 
-    if response.status_code == 200:
-        data = response.json()
+    url = f"https://api.mfapi.in/mf/{amfi_code}"
 
-        df = pd.DataFrame(data["data"])
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
 
-        filename = f"data/raw/{name}.csv"
-        df.to_csv(filename, index=False)
+        json_data = response.json()
 
-        print(f"✔ Saved {filename}")
-    else:
-        print(f"✘ Failed to fetch {name}")
+        # Convert NAV history to DataFrame
+        nav_df = pd.DataFrame(json_data["data"])
+
+        # Save CSV
+        file_path = f"data/raw/api/{scheme_name}.csv"
+        nav_df.to_csv(file_path, index=False)
+
+        print(f"\n✅ {scheme_name}")
+        print(f"AMFI Code : {amfi_code}")
+        print(f"Records   : {len(nav_df)}")
+        print(f"Saved To  : {file_path}")
+
+    except Exception as e:
+        print(f"\n❌ Failed to fetch {scheme_name}")
+        print(e)
+
+print("\n" + "=" * 70)
+print("ALL REQUESTS COMPLETED")
+print("=" * 70)

@@ -86,10 +86,16 @@ The provided datasets were successfully loaded into Pandas and inspected.
 
 ## AMFI Validation
 
-- Verified every AMFI code in `fund_master` against `nav_history`.
-- Validation script executed successfully.
+Validation was performed between `01_fund_master.csv` and `02_nav_history.csv`.
 
----
+Results:
+
+- Total Fund Master Codes: 40
+- Total Unique NAV Codes: 40
+- Missing Codes: 0
+
+All AMFI codes in `01_fund_master.csv` are present in `02_nav_history.csv`.
+
 
 ## Conclusion
 
