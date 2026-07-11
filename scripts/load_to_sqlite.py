@@ -1,224 +1,235 @@
+import sys
 import pandas as pd
-from sqlalchemy import create_engine, text
+import sqlite3
+import logging
+from pathlib import Path
 
-print("=" * 80)
-print("LOADING DATA INTO SQLITE")
-print("=" * 80)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# --------------------------------------------------
-# Create SQLite Database
-# --------------------------------------------------
-
-engine = create_engine(
-    "sqlite:///bluestock_mf.db"
+from scripts.config import (
+    PROJECT_ROOT, DATA_PROCESSED, DB_PATH, SCHEMA_SQL, DB_TABLES,
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+logger.info("=" * 80)
+logger.info("LOADING DATA INTO SQLITE")
+logger.info("=" * 80)
+
+engine = None
+try:
+    from sqlalchemy import create_engine, text
+    engine = create_engine(f"sqlite:///{DB_PATH}")
+    logger.info("Using SQLAlchemy engine")
+except ImportError:
+    logger.warning("SQLAlchemy not available, falling back to sqlite3")
+
 # --------------------------------------------------
 # Execute schema.sql
 # --------------------------------------------------
+with open(SCHEMA_SQL, "r", encoding="utf-8") as f:
+    schema_sql = f.read()
 
-import sqlite3
-
-# --------------------------------------------------
-# Execute schema.sql
-# --------------------------------------------------
-
-with open("sql/schema.sql", "r", encoding="utf-8") as file:
-    schema_sql = file.read()
-
-conn = sqlite3.connect("bluestock_mf.db")
-
+conn = sqlite3.connect(str(DB_PATH))
 conn.executescript(schema_sql)
-
 conn.commit()
 conn.close()
-
-print("✓ Schema created")
+logger.info("✓ Schema created from %s", SCHEMA_SQL.name)
 
 # --------------------------------------------------
-# Load Dimension Tables
+# Load dim_fund
 # --------------------------------------------------
+fund_master = pd.read_csv(DATA_PROCESSED / "01_fund_master.csv")
+dim_fund_cols = [
+    "amfi_code", "scheme_name", "fund_house", "category", "sub_category",
+    "plan", "launch_date", "benchmark", "expense_ratio_pct",
+    "exit_load_pct", "min_sip_amount", "min_lumpsum_amount",
+    "fund_manager", "risk_category", "sebi_category_code",
+]
+dim_fund = fund_master[dim_fund_cols].copy()
 
-fund_master = pd.read_csv(
-    "data/processed/01_fund_master.csv"
-)
+if engine:
+    dim_fund.to_sql("dim_fund", engine, if_exists="replace", index=False)
+else:
+    conn = sqlite3.connect(str(DB_PATH))
+    dim_fund.to_sql("dim_fund", conn, if_exists="replace", index=False)
+    conn.close()
 
-dim_fund = fund_master[
-    [
-        "amfi_code",
-        "scheme_name",
-        "fund_house",
-        "category",
-        "sub_category",
-        "plan",
-        "fund_manager",
-        "risk_category"
-    ]
+logger.info("✓ dim_fund loaded (%d rows)", len(dim_fund))
+
+# --------------------------------------------------
+# Create dim_date from all date-bearing tables
+# --------------------------------------------------
+nav = pd.read_csv(DATA_PROCESSED / "02_nav_history.csv")
+nav["date"] = pd.to_datetime(nav["date"])
+
+all_dates = pd.DataFrame({"full_date": sorted(nav["date"].unique())})
+
+aum = pd.read_csv(DATA_PROCESSED / "03_aum_by_fund_house.csv")
+aum_dates = pd.to_datetime(aum["date"].dropna().unique())
+all_dates = pd.concat([all_dates, pd.DataFrame({"full_date": aum_dates})])
+
+all_dates["full_date"] = pd.to_datetime(all_dates["full_date"])
+all_dates = all_dates.drop_duplicates().sort_values("full_date").reset_index(drop=True)
+
+all_dates["date_id"] = all_dates.index + 1
+all_dates["year"] = all_dates["full_date"].dt.year
+all_dates["month"] = all_dates["full_date"].dt.month
+all_dates["quarter"] = all_dates["full_date"].dt.quarter
+all_dates["is_month_end"] = (
+    all_dates["full_date"] == all_dates["full_date"] + pd.offsets.MonthEnd(0)
+).astype(int)
+all_dates["is_year_end"] = (
+    all_dates["full_date"] == all_dates["full_date"] + pd.offsets.YearEnd(0)
+).astype(int)
+
+dim_date = all_dates[["date_id", "full_date", "year", "month", "quarter",
+                       "is_month_end", "is_year_end"]]
+
+if engine:
+    dim_date.to_sql("dim_date", engine, if_exists="replace", index=False)
+else:
+    conn = sqlite3.connect(str(DB_PATH))
+    dim_date.to_sql("dim_date", conn, if_exists="replace", index=False)
+    conn.close()
+
+logger.info("✓ dim_date loaded (%d rows)", len(dim_date))
+
+# --------------------------------------------------
+# Load fact_nav with date_id FK
+# --------------------------------------------------
+date_map = dim_date.set_index("full_date")["date_id"].to_dict()
+nav["date_id"] = nav["date"].map(date_map)
+fact_nav = nav[["amfi_code", "date_id", "nav"]].copy()
+
+if engine:
+    fact_nav.to_sql("fact_nav", engine, if_exists="replace", index=False)
+else:
+    conn = sqlite3.connect(str(DB_PATH))
+    fact_nav.to_sql("fact_nav", conn, if_exists="replace", index=False)
+    conn.close()
+
+logger.info("✓ fact_nav loaded (%d rows)", len(fact_nav))
+
+# --------------------------------------------------
+# Load fact_transactions — preserve investor_id as column, auto-increment PK
+# --------------------------------------------------
+tx = pd.read_csv(DATA_PROCESSED / "08_investor_transactions.csv")
+tx["transaction_date"] = pd.to_datetime(tx["transaction_date"])
+
+tx_cols = [
+    "investor_id", "transaction_date", "amfi_code", "transaction_type",
+    "amount_inr", "state", "city", "city_tier", "age_group", "gender",
+    "annual_income_lakh", "payment_mode", "kyc_status",
 ]
 
-dim_fund.to_sql(
-    "dim_fund",
-    engine,
-    if_exists="replace",
-    index=False
-)
+fact_tx = tx[tx_cols].copy()
+fact_tx["transaction_id"] = range(1, len(fact_tx) + 1)
 
-print("✓ dim_fund loaded")
+if engine:
+    fact_tx.to_sql("fact_transactions", engine, if_exists="replace", index=False)
+else:
+    conn = sqlite3.connect(str(DB_PATH))
+    fact_tx.to_sql("fact_transactions", conn, if_exists="replace", index=False)
+    conn.close()
 
-# --------------------------------------------------
-# Create dim_date
-# --------------------------------------------------
-
-nav = pd.read_csv(
-    "data/processed/02_nav_history.csv"
-)
-
-nav["date"] = pd.to_datetime(
-    nav["date"]
-)
-
-unique_dates = pd.DataFrame({
-    "full_date": sorted(
-        nav["date"].unique()
-    )
-})
-
-unique_dates["date_id"] = (
-    unique_dates.index + 1
-)
-
-unique_dates = unique_dates[
-    ["date_id", "full_date"]
-]
-
-unique_dates.to_sql(
-    "dim_date",
-    engine,
-    if_exists="replace",
-    index=False
-)
-
-print("✓ dim_date loaded")
+logger.info("✓ fact_transactions loaded (%d rows)", len(fact_tx))
 
 # --------------------------------------------------
-# Create fact_nav
+# Load fact_performance
 # --------------------------------------------------
+perf = pd.read_csv(DATA_PROCESSED / "07_scheme_performance.csv")
 
-fact_nav = nav.merge(
-    unique_dates,
-    left_on="date",
-    right_on="full_date"
-)
+if engine:
+    perf.to_sql("fact_performance", engine, if_exists="replace", index=False)
+else:
+    conn = sqlite3.connect(str(DB_PATH))
+    perf.to_sql("fact_performance", conn, if_exists="replace", index=False)
+    conn.close()
 
-fact_nav = fact_nav[
-    [
-        "amfi_code",
-        "date_id",
-        "nav"
-    ]
-]
-
-fact_nav.to_sql(
-    "fact_nav",
-    engine,
-    if_exists="replace",
-    index=False
-)
-
-print("✓ fact_nav loaded")
+logger.info("✓ fact_performance loaded (%d rows)", len(perf))
 
 # --------------------------------------------------
-# Create fact_transactions
+# Load fact_aum with date_id FK
 # --------------------------------------------------
+aum = pd.read_csv(DATA_PROCESSED / "03_aum_by_fund_house.csv")
+aum["date"] = pd.to_datetime(aum["date"])
 
-transactions = pd.read_csv(
-    "data/processed/08_investor_transactions.csv"
-)
+aum_date_map = dim_date.set_index("full_date")["date_id"].to_dict()
+aum["date_id"] = aum["date"].map(aum_date_map)
 
-fact_transactions = transactions.rename(
-    columns={
-        "investor_id": "transaction_id"
-    }
-)
+fact_aum = aum[["date_id", "fund_house", "aum_lakh_crore", "aum_crore", "num_schemes"]].copy()
+fact_aum = fact_aum.dropna(subset=["date_id"])
 
-fact_transactions.to_sql(
-    "fact_transactions",
-    engine,
-    if_exists="replace",
-    index=False
-)
+if engine:
+    fact_aum.to_sql("fact_aum", engine, if_exists="replace", index=False)
+else:
+    conn = sqlite3.connect(str(DB_PATH))
+    fact_aum.to_sql("fact_aum", conn, if_exists="replace", index=False)
+    conn.close()
 
-print("✓ fact_transactions loaded")
+logger.info("✓ fact_aum loaded (%d rows)", len(fact_aum))
 
 # --------------------------------------------------
-# Create fact_performance
+# Load additional tables
 # --------------------------------------------------
+additional = {
+    "fact_category_inflows": ("05_category_inflows.csv", ["month", "category", "net_inflow_crore"]),
+    "fact_sip_inflows": ("04_monthly_sip_inflows.csv", None),
+    "fact_folio_count": ("06_industry_folio_count.csv", None),
+    "fact_portfolio_holdings": ("09_portfolio_holdings.csv", None),
+    "fact_benchmark_indices": ("10_benchmark_indices.csv", None),
+}
 
-performance = pd.read_csv(
-    "data/processed/07_scheme_performance.csv"
-)
+for table_name, (csv_file, cols) in additional.items():
+    df = pd.read_csv(DATA_PROCESSED / csv_file)
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"])
+    if "month" in df.columns:
+        df["month"] = pd.to_datetime(df["month"])
+    if "portfolio_date" in df.columns:
+        df["portfolio_date"] = pd.to_datetime(df["portfolio_date"])
 
-performance.to_sql(
-    "fact_performance",
-    engine,
-    if_exists="replace",
-    index=False
-)
+    if cols:
+        df = df[cols].copy()
 
-print("✓ fact_performance loaded")
+    if engine:
+        df.to_sql(table_name, engine, if_exists="replace", index=False)
+    else:
+        conn = sqlite3.connect(str(DB_PATH))
+        df.to_sql(table_name, conn, if_exists="replace", index=False)
+        conn.close()
 
-# --------------------------------------------------
-# Create fact_aum
-# --------------------------------------------------
-
-aum = pd.read_csv(
-    "data/processed/03_aum_by_fund_house.csv"
-)
-
-aum.to_sql(
-    "fact_aum",
-    engine,
-    if_exists="replace",
-    index=False
-)
-
-print("✓ fact_aum loaded")
+    logger.info("✓ %s loaded (%d rows)", table_name, len(df))
 
 # --------------------------------------------------
 # Verify Row Counts
 # --------------------------------------------------
+logger.info("")
+logger.info("=" * 80)
+logger.info("ROW COUNT VERIFICATION")
+logger.info("=" * 80)
 
-print("\n")
-print("=" * 80)
-print("ROW COUNT VERIFICATION")
-print("=" * 80)
-
-tables = [
-    "dim_fund",
-    "dim_date",
-    "fact_nav",
-    "fact_transactions",
-    "fact_performance",
-    "fact_aum"
+all_tables = DB_TABLES + [
+    "fact_category_inflows", "fact_sip_inflows", "fact_folio_count",
+    "fact_portfolio_holdings", "fact_benchmark_indices",
 ]
 
-with engine.connect() as conn:
+conn = sqlite3.connect(str(DB_PATH))
+for table in all_tables:
+    try:
+        result = conn.execute(f"SELECT COUNT(*) FROM {table}")
+        count = result.fetchone()[0]
+        logger.info("  %-30s : %6d", table, count)
+    except Exception as e:
+        logger.warning("  %-30s : ERROR (%s)", table, e)
+conn.close()
 
-    for table in tables:
-
-        result = conn.execute(
-            text(
-                f"SELECT COUNT(*) FROM {table}"
-            )
-        )
-
-        count = result.scalar()
-
-        print(
-            f"{table:<20} : {count}"
-        )
-
-print("\n")
-print("=" * 80)
-print("DATABASE LOAD COMPLETED")
-print("=" * 80)
+logger.info("")
+logger.info("=" * 80)
+logger.info("DATABASE LOAD COMPLETED")
+logger.info("=" * 80)
