@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Cron job line:
-# 0 20 * * 1-5 cd /path/to/project && python3 scripts/nav_cron_fetcher.py
 
 import os
 import requests

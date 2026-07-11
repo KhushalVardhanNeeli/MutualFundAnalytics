@@ -1,162 +1,125 @@
-# Mutual Fund Analytics Capstone
+# Bluestock — Mutual Fund Analytics
 
-Complete end-to-end mutual fund analytics project covering data ingestion, SQL analytics, exploratory data analysis,
-performance metrics, advanced analytics, and interactive dashboarding.
+A complete mutual fund analytics project built from the ground up. Covers everything from raw data ingestion through SQL analytics, EDA, performance metrics, advanced risk modelling, and interactive dashboards.
 
 ---
 
-## Project Structure
+## What's Inside
 
 ```
 bluestock_mf_capstone/
 ├── data/
-│   ├── raw/              ← Original downloaded CSV files (10 datasets)
-│   ├── raw/api/          ← Live NAV data fetched from MFAPI
-│   ├── processed/        ← Cleaned datasets ready for analysis
-│   └── db/               ← bluestock_mf.db (SQLite database)
+│   ├── raw/              ← Original CSVs (10 datasets)
+│   ├── raw/api/          ← Live NAV from MFAPI
+│   ├── processed/        ← Cleaned, analysis-ready
+│   └── db/               ← SQLite database
 ├── scripts/
-│   ├── config.py         ← Shared configuration (paths, codes, constants)
-│   ├── etl_pipeline.py   ← Master pipeline runner (all steps)
-│   ├── data_ingestion.py ← Load and explore all 10 raw CSVs
-│   ├── validate_amfi.py  ← Validate AMFI codes between datasets
-│   ├── explore_fund_master.py ← Fund master exploration
-│   ├── live_nav_fetch.py ← Fetch live NAV from mfapi.in
-│   ├── nav_cron_fetcher.py    ← Cron-ready NAV fetcher (JSON + CSV)
+│   ├── config.py         ← Shared config — paths, codes, constants
+│   ├── etl_pipeline.py   ← One command to run it all
+│   ├── data_ingestion.py ← Load & explore raw data
+│   ├── validate_amfi.py  ← Cross-check fund master vs NAV
+│   ├── explore_fund_master.py ← Quick fund master look
+│   ├── live_nav_fetch.py ← Hit mfapi.in for current NAV
+│   ├── nav_cron_fetcher.py    ← Scheduled NAV fetcher (JSON + CSV)
 │   ├── data_cleaning.py  ← Clean all 10 datasets
-│   ├── load_to_sqlite.py ← Load cleaned data into SQLite star schema
-│   ├── compute_metrics.py     ← VaR/CVaR, HHI, rolling Sharpe
-│   ├── recommender.py         ← Fund recommender by risk appetite
-│   ├── monte_carlo_nav.py     ← Monte Carlo NAV projection (5 years)
-│   ├── markowitz_efficient_frontier.py ← Efficient Frontier optimisation
-│   └── email_report_generator.py      ← Weekly HTML email reports
+│   ├── load_to_sqlite.py ← Star schema into SQLite
+│   ├── compute_metrics.py     ← VaR, CVaR, HHI, rolling Sharpe
+│   ├── recommender.py         ← Risk-based fund picker
+│   ├── monte_carlo_nav.py     ← 10K-path NAV projection
+│   ├── markowitz_efficient_frontier.py ← Efficient frontier
+│   └── email_report_generator.py      ← Weekly HTML reports
 ├── sql/
-│   ├── schema.sql        ← Database star schema (dim + fact tables)
-│   └── queries.sql       ← 15 analytical SQL queries
+│   ├── schema.sql        ← Full star schema (dim + fact)
+│   └── queries.sql       ← 15 analytical queries
 ├── notebooks/
-│   ├── 01_data_ingestion.ipynb         ← Load & explore all 10 raw CSVs
-│   ├── 02_data_cleaning.ipynb          ← Clean & validate datasets
-│   ├── 03_eda_analysis.ipynb           ← Exploratory Data Analysis (15+ charts)
-│   ├── 04_performance_analytics.ipynb  ← CAGR, Sharpe, Alpha/Beta, Scorecard
-│   └── 05_advanced_analytics.ipynb     ← VaR, Cohorts, Recommender, HHI
+│   ├── 01_data_ingestion.ipynb
+│   ├── 02_data_cleaning.ipynb
+│   ├── 03_eda_analysis.ipynb
+│   ├── 04_performance_analytics.ipynb
+│   └── 05_advanced_analytics.ipynb
 ├── dashboard/
-│   ├── bluestock_mf.pbix        ← Power BI 4-page dashboard
-│   └── streamlit_app.py        ← Streamlit web app alternative
-├── charts/                ← Exported PNG/HTML chart outputs
+│   ├── bluestock_mf.pbix        ← Power BI (4 pages)
+│   └── streamlit_app.py        ← Streamlit alternative
+├── charts/                ← Exported PNG/HTML outputs
 ├── reports/
-│   ├── data_quality_summary.md  ← Data quality findings
-│   ├── data_dictionary.md       ← Full column-level documentation
-│   ├── fund_scorecard.csv       ← Composite fund ranking (0-100)
-│   ├── alpha_beta.csv           ← Alpha/Beta for all 40 funds
-│   └── weekly_report_*.html     ← Generated weekly email reports
-└── requirements.txt       ← Python dependencies
+│   ├── data_quality_summary.md
+│   ├── data_dictionary.md
+│   ├── fund_scorecard.csv
+│   ├── alpha_beta.csv
+│   ├── var_cvar_report.csv
+│   └── weekly_report_*.html
+└── requirements.txt
 ```
 
 ---
 
-## Database Tables (bluestock_mf.db)
+## Database at a Glance
 
-### Dimension Tables
-| Table | Key | Description |
-|---|---|---|
-| dim_fund | amfi_code | Scheme master data (name, house, category, risk, manager) |
-| dim_date | date_id | Calendar dimension with year/month/quarter flags |
+Two dimensions, nine facts. Everything ties back to `amfi_code` and `date_id`.
 
-### Fact Tables
-| Table | Key | FKs | Description |
-|---|---|---|---|
-| fact_nav | nav_id (auto) | amfi_code, date_id | Daily NAV for all 40 schemes |
-| fact_transactions | transaction_id (auto) | amfi_code | 32K+ investor transactions |
-| fact_performance | amfi_code | amfi_code | Returns, Sharpe, Alpha, Beta, AUM |
-| fact_aum | aum_id (auto) | date_id | Quarterly AUM by fund house |
-| fact_sip_inflows | sip_id (auto) | — | Monthly SIP industry data |
-| fact_category_inflows | inflow_id (auto) | — | Category-wise net inflows |
-| fact_folio_count | folio_id (auto) | — | Industry folio statistics |
-| fact_portfolio_holdings | holding_id (auto) | amfi_code | Fund portfolio stock holdings |
-| fact_benchmark_indices | benchmark_id (auto) | — | NIFTY50 / NIFTY100 daily values |
+| Table | What It Holds |
+|---|---|
+| `dim_fund` | Scheme names, fund houses, categories, risk grades |
+| `dim_date` | Calendar with year/month/quarter flags |
+| `fact_nav` | Daily NAV for all 40 schemes |
+| `fact_transactions` | 32K+ investor transactions |
+| `fact_performance` | Returns, Sharpe, Alpha, Beta, AUM |
+| `fact_aum` | Quarterly AUM by fund house |
+| `fact_sip_inflows` | Monthly SIP aggregates |
+| `fact_category_inflows` | Category-wise net flows |
+| `fact_folio_count` | Industry folio stats |
+| `fact_portfolio_holdings` | Stock-level holdings |
+| `fact_benchmark_indices` | NIFTY50/NIFTY100 daily values |
 
 ---
 
-## Quick Start
+## Getting Started
 
-### 1. Install Dependencies
 ```bash
-pip install -r requirements.txt
-```
+pip install -r requirements.txt        # Dependencies
 
-### 2. Run ETL Pipeline
-```bash
-python scripts/data_ingestion.py          # Explore raw data
-python scripts/data_cleaning.py           # Clean all 10 datasets
-python scripts/load_to_sqlite.py          # Load into SQLite DB
-python scripts/validate_amfi.py           # Validate AMFI codes
-```
+python scripts/etl_pipeline.py         # Run everything
+# or step by step:
+python scripts/data_ingestion.py
+python scripts/data_cleaning.py
+python scripts/load_to_sqlite.py
+python scripts/validate_amfi.py
 
-### 3. Live NAV Fetch
-```bash
-python scripts/live_nav_fetch.py
-```
-
-### 4. Run Notebooks
-```bash
+python scripts/live_nav_fetch.py       # Live NAV from MFAPI
+python scripts/compute_metrics.py      # VaR + HHI
+python scripts/recommender.py Moderate # Fund picks by risk
+python scripts/email_report_generator.py
+streamlit run dashboard/streamlit_app.py
 jupyter notebook notebooks/
 ```
 
-### 5. Compute Performance Metrics
-```bash
-python scripts/compute_metrics.py         # VaR/CVaR + HHI
-python scripts/monte_carlo_nav.py         # Monte Carlo projection
-python scripts/markowitz_efficient_frontier.py  # Portfolio optimisation
-```
+---
 
-### 6. Generate Weekly Report
-```bash
-# Set env vars for email: SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO
-python scripts/email_report_generator.py
-```
+## Deliverables
 
-### 7. Streamlit Dashboard
-```bash
-streamlit run dashboard/streamlit_app.py
-```
+| What | Where | Weight |
+|---|---|---|
+| ETL Pipeline | `scripts/*.py` | 15% |
+| SQLite DB + Queries | `data/db/`, `sql/` | 10% |
+| EDA Notebook | `notebooks/03_eda_analysis.ipynb` | 15% |
+| Performance Metrics | `notebooks/04_performance_analytics.ipynb` | 15% |
+| Dashboard | `dashboard/` | 20% |
+| Advanced Analytics | `notebooks/05_advanced_analytics.ipynb` | 10% |
+| Report + Slides | `reports/` | 15% |
 
-### 8. Cron Job (Bonus)
-```bash
-# Add to crontab:
-# 0 20 * * 1-5 cd /path/to/project && python3 scripts/nav_cron_fetcher.py
-```
+### Bonus
+- B1: Cron NAV fetcher — `scripts/nav_cron_fetcher.py`
+- B2: Streamlit app — `dashboard/streamlit_app.py`
+- B3: Monte Carlo — `scripts/monte_carlo_nav.py`
+- B4: Markowitz Frontier — `scripts/markowitz_efficient_frontier.py`
+- B5: Email reports — `scripts/email_report_generator.py`
 
 ---
 
-## Key Deliverables
+## Stack
 
-| ID | Deliverable | Format | Status |
-|---|---|---|---|
-| D1 | ETL Pipeline | scripts/*.py | Done |
-| D2 | SQLite Database | bluestock_mf.db | Done |
-| D3 | EDA Notebook | notebooks/03_eda_analysis.ipynb | Done |
-| D4 | Performance Metrics | notebooks/04_performance_analytics.ipynb | Done |
-| D5 | Interactive Dashboard | dashboard/ | Done |
-| D6 | Advanced Analytics | notebooks/05_advanced_analytics.ipynb | Done |
-| D7 | Final Report + Slides | reports/ | Done |
-| B1 | Cron NAV Fetcher | scripts/nav_cron_fetcher.py | Done |
-| B2 | Streamlit App | dashboard/streamlit_app.py | Done |
-| B3 | Monte Carlo Simulation | scripts/monte_carlo_nav.py | Done |
-| B4 | Markowitz Frontier | scripts/markowitz_efficient_frontier.py | Done |
-| B5 | Email Report Generator | scripts/email_report_generator.py | Done |
+Python 3 · Pandas · NumPy · SciPy · StatsModels · Matplotlib · Seaborn · Plotly · SQLite · SQLAlchemy · Jupyter · Power BI · Streamlit · mfapi.in
 
 ---
 
-## Technologies
-
-- Python 3, Pandas, NumPy, SciPy, StatsModels
-- Matplotlib, Seaborn, Plotly (visualisation)
-- SQLite + SQLAlchemy (database)
-- Jupyter Notebook (analysis)
-- Power BI + Streamlit (dashboarding)
-- MFAPI.in (live NAV integration)
-
----
-
-## License
-
-This project is for educational/capstone purposes. Mutual fund investments are subject to market risks.
+Mutual fund investments are subject to market risks. This is an educational project — not financial advice.

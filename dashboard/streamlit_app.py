@@ -9,7 +9,6 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import streamlit as st
 
-# ────────── Page Config ──────────
 st.set_page_config(
     page_title="Bluestock Mutual Fund Analytics",
     page_icon="📊",
@@ -17,7 +16,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ────────── Constants / Paths ──────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "db" / "bluestock_mf.db"
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
@@ -33,7 +31,6 @@ COLORSCALE_BLUES = [[0, BLUESTOCK_LIGHT_BLUE], [1, BLUESTOCK_BLUE]]
 PLOTLY_TEMPLATE = "plotly_white"
 
 
-# ────────── CSS Styling ──────────
 def apply_custom_css():
     st.markdown(
         f"""
@@ -130,7 +127,6 @@ def apply_custom_css():
     )
 
 
-# ────────── Data Loading (Cached) ──────────
 @st.cache_data(ttl=600)
 def load_sql_data(query: str, params=None) -> pd.DataFrame:
     """Execute a SQL query and return a DataFrame."""
@@ -179,7 +175,6 @@ def fmt_num(val, decimals=2):
         return str(val)
 
 
-# ────────── Chart Styling Helpers ──────────
 def chart_layout(fig, title=None, x_title=None, y_title=None, height=450):
     """Apply consistent Bluestock styling to a Plotly figure."""
     fig.update_layout(
@@ -200,7 +195,6 @@ def chart_layout(fig, title=None, x_title=None, y_title=None, height=450):
     return fig
 
 
-# ────────── Sidebar ──────────
 def render_sidebar():
     with st.sidebar:
         st.markdown(
@@ -244,9 +238,6 @@ def render_sidebar():
         return page
 
 
-# ═══════════════════════════════════════════
-# PAGE 1: Industry Overview
-# ═══════════════════════════════════════════
 def page_industry_overview():
     st.markdown(
         "<h1 style='margin-bottom:0;'>Industry Overview</h1>"
@@ -254,12 +245,10 @@ def page_industry_overview():
         unsafe_allow_html=True,
     )
 
-    # ── KPI Cards ──
     aum_df = load_sql_data("SELECT * FROM fact_aum")
     sip_csv = load_csv("04_monthly_sip_inflows.csv")
     folio_csv = load_csv("06_industry_folio_count.csv")
 
-    # Total AUM (latest date, lakh crore)
     total_aum_lc = 0
     total_schemes = 0
     if not aum_df.empty:
@@ -268,14 +257,12 @@ def page_industry_overview():
         total_aum_lc = latest_aum["aum_lakh_crore"].sum()
         total_schemes = int(latest_aum["num_schemes"].sum())
 
-    # Latest SIP inflow (crore)
     latest_sip = 0
     if not sip_csv.empty:
         sip_csv["month_dt"] = pd.to_datetime(sip_csv["month"], errors="coerce")
         latest_row = sip_csv.loc[sip_csv["month_dt"].idxmax()]
         latest_sip = latest_row.get("sip_inflow_crore", 0)
 
-    # Latest folios (crore)
     latest_folios = 0
     if not folio_csv.empty:
         folio_csv["month_dt"] = pd.to_datetime(folio_csv["month"], errors="coerce")
@@ -312,7 +299,6 @@ def page_industry_overview():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Industry AUM Trend ──
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
@@ -373,9 +359,6 @@ def page_industry_overview():
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════
-# PAGE 2: Fund Performance
-# ═══════════════════════════════════════════
 def page_fund_performance():
     st.markdown(
         "<h1 style='margin-bottom:0;'>Fund Performance</h1>"
@@ -383,7 +366,6 @@ def page_fund_performance():
         unsafe_allow_html=True,
     )
 
-    # Load data
     perf_df = load_sql_data("SELECT * FROM fact_performance")
     fund_df = load_sql_data("SELECT * FROM dim_fund")
     nav_raw = load_sql_data("""
@@ -399,7 +381,6 @@ def page_fund_performance():
         st.warning("Fund performance data not available.")
         return
 
-    # Preprocess
     if "fund_house" not in perf_df.columns and "scheme_name" in perf_df.columns and not fund_df.empty:
         perf_df = perf_df.merge(fund_df[["amfi_code", "fund_house", "plan", "sub_category"]], on="amfi_code", how="left")
         if "plan_x" in perf_df.columns:
@@ -416,7 +397,6 @@ def page_fund_performance():
     categories = ["All"] + sorted(perf_df["category_display"].dropna().unique().tolist())
     plans = ["All"] + sorted(perf_df["plan"].dropna().unique().tolist())
 
-    # ── Slicers ──
     c1, c2, c3 = st.columns(3)
     with c1:
         selected_house = st.selectbox("Fund House", fund_houses)
@@ -425,7 +405,6 @@ def page_fund_performance():
     with c3:
         selected_plan = st.selectbox("Plan", plans)
 
-    # Filter
     filtered = perf_df.copy()
     if selected_house != "All":
         filtered = filtered[filtered["fund_house"] == selected_house]
@@ -438,7 +417,6 @@ def page_fund_performance():
         st.warning("No funds match the selected filters.")
         return
 
-    # ── Scatter Plot ──
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.subheader("Risk vs Return (3-Year)")
 
@@ -467,7 +445,6 @@ def page_fund_performance():
         st.info("Insufficient data for scatter plot.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Fund Scorecard Table ──
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.subheader("Fund Scorecard")
 
@@ -506,7 +483,6 @@ def page_fund_performance():
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── NAV Line Chart vs Benchmark ──
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.subheader("NAV Trend vs Benchmark")
 
@@ -523,7 +499,6 @@ def page_fund_performance():
         fund_nav["full_date"] = pd.to_datetime(fund_nav["full_date"])
         fund_nav = fund_nav.sort_values("full_date").drop_duplicates(subset=["full_date"])
 
-        # Normalise NAV to base 100
         base_nav = fund_nav["nav"].iloc[0] if len(fund_nav) > 0 else 100
         fund_nav["nav_idx"] = (fund_nav["nav"] / base_nav) * 100
 
@@ -539,7 +514,6 @@ def page_fund_performance():
             )
         )
 
-        # Overlay NIFTY benchmark (normalised to same start date)
         if not bench_csv.empty:
             nifty = bench_csv[bench_csv["index_name"] == "NIFTY50"].copy()
             if not nifty.empty:
@@ -569,9 +543,6 @@ def page_fund_performance():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════
-# PAGE 3: Investor Analytics
-# ═══════════════════════════════════════════
 def page_investor_analytics():
     st.markdown(
         "<h1 style='margin-bottom:0;'>Investor Analytics</h1>"
@@ -590,7 +561,6 @@ def page_investor_analytics():
     txn_df["transaction_date"] = pd.to_datetime(txn_df["transaction_date"], errors="coerce")
     txn_df["month"] = txn_df["transaction_date"].dt.to_period("M").dt.to_timestamp()
 
-    # ── Slicers ──
     c1, c2 = st.columns(2)
     with c1:
         states = ["All"] + sorted(txn_df["state"].dropna().unique().tolist())
@@ -599,14 +569,12 @@ def page_investor_analytics():
         tiers = ["All"] + sorted(txn_df["city_tier"].dropna().unique().tolist())
         selected_tier = st.selectbox("City Tier", tiers)
 
-    # Apply filters
     txn_filtered = txn_df.copy()
     if selected_state != "All":
         txn_filtered = txn_filtered[txn_filtered["state"] == selected_state]
     if selected_tier != "All":
         txn_filtered = txn_filtered[txn_filtered["city_tier"] == selected_tier]
 
-    # ── Row 1: State bar + Donut ──
     col_left, col_right = st.columns([3, 2])
 
     with col_left:
@@ -666,7 +634,6 @@ def page_investor_analytics():
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Row 2: Age group + Monthly trend ──
     col_left2, col_right2 = st.columns([1, 2])
 
     with col_left2:
@@ -680,7 +647,6 @@ def page_investor_analytics():
         )
         sip_by_age["amount_disp"] = sip_by_age["amount_inr"].apply(lambda x: f"₹{x:,.0f}")
 
-        # Sort by age group order
         age_order = ["18-25", "26-35", "36-45", "46-55", "56+"]
         sip_by_age["sort_key"] = sip_by_age["age_group"].apply(
             lambda x: age_order.index(x) if x in age_order else 99
@@ -746,9 +712,6 @@ def page_investor_analytics():
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════
-# PAGE 4: SIP & Market Trends
-# ═══════════════════════════════════════════
 def page_sip_market():
     st.markdown(
         "<h1 style='margin-bottom:0;'>SIP & Market Trends</h1>"
@@ -760,7 +723,6 @@ def page_sip_market():
     bench_csv = load_csv("10_benchmark_indices.csv")
     cat_csv = load_csv("05_category_inflows.csv")
 
-    # ── Dual-axis: SIP Inflow + NIFTY ──
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.subheader("Monthly SIP Inflows vs NIFTY 50")
 
@@ -804,7 +766,6 @@ def page_sip_market():
         st.info("SIP inflow or benchmark data not available.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Category Inflow Heatmap ──
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
 
     if not cat_csv.empty:
@@ -836,7 +797,6 @@ def page_sip_market():
 
         with col_t:
             st.subheader("Top 5 Categories by Net Inflow")
-            # Latest year
             cat_csv["year"] = cat_csv["month"].dt.year
             latest_year = int(cat_csv["year"].max())
             year_data = cat_csv[cat_csv["year"] == latest_year]
@@ -869,9 +829,6 @@ def page_sip_market():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# ═══════════════════════════════════════════
-# MAIN
-# ═══════════════════════════════════════════
 def main():
     apply_custom_css()
     page = render_sidebar()

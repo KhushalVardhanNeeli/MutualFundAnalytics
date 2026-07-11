@@ -29,9 +29,6 @@ try:
 except ImportError:
     logger.warning("SQLAlchemy not available, falling back to sqlite3")
 
-# --------------------------------------------------
-# Execute schema.sql
-# --------------------------------------------------
 with open(SCHEMA_SQL, "r", encoding="utf-8") as f:
     schema_sql = f.read()
 
@@ -41,9 +38,6 @@ conn.commit()
 conn.close()
 logger.info("✓ Schema created from %s", SCHEMA_SQL.name)
 
-# --------------------------------------------------
-# Load dim_fund
-# --------------------------------------------------
 fund_master = pd.read_csv(DATA_PROCESSED / "01_fund_master.csv")
 dim_fund_cols = [
     "amfi_code", "scheme_name", "fund_house", "category", "sub_category",
@@ -62,9 +56,6 @@ else:
 
 logger.info("✓ dim_fund loaded (%d rows)", len(dim_fund))
 
-# --------------------------------------------------
-# Create dim_date from all date-bearing tables
-# --------------------------------------------------
 nav = pd.read_csv(DATA_PROCESSED / "02_nav_history.csv")
 nav["date"] = pd.to_datetime(nav["date"])
 
@@ -100,9 +91,6 @@ else:
 
 logger.info("✓ dim_date loaded (%d rows)", len(dim_date))
 
-# --------------------------------------------------
-# Load fact_nav with date_id FK
-# --------------------------------------------------
 date_map = dim_date.set_index("full_date")["date_id"].to_dict()
 nav["date_id"] = nav["date"].map(date_map)
 fact_nav = nav[["amfi_code", "date_id", "nav"]].copy()
@@ -116,9 +104,6 @@ else:
 
 logger.info("✓ fact_nav loaded (%d rows)", len(fact_nav))
 
-# --------------------------------------------------
-# Load fact_transactions — preserve investor_id as column, auto-increment PK
-# --------------------------------------------------
 tx = pd.read_csv(DATA_PROCESSED / "08_investor_transactions.csv")
 tx["transaction_date"] = pd.to_datetime(tx["transaction_date"])
 
@@ -140,9 +125,6 @@ else:
 
 logger.info("✓ fact_transactions loaded (%d rows)", len(fact_tx))
 
-# --------------------------------------------------
-# Load fact_performance
-# --------------------------------------------------
 perf = pd.read_csv(DATA_PROCESSED / "07_scheme_performance.csv")
 
 if engine:
@@ -154,9 +136,6 @@ else:
 
 logger.info("✓ fact_performance loaded (%d rows)", len(perf))
 
-# --------------------------------------------------
-# Load fact_aum with date_id FK
-# --------------------------------------------------
 aum = pd.read_csv(DATA_PROCESSED / "03_aum_by_fund_house.csv")
 aum["date"] = pd.to_datetime(aum["date"])
 
@@ -175,9 +154,6 @@ else:
 
 logger.info("✓ fact_aum loaded (%d rows)", len(fact_aum))
 
-# --------------------------------------------------
-# Load additional tables
-# --------------------------------------------------
 additional = {
     "fact_category_inflows": ("05_category_inflows.csv", ["month", "category", "net_inflow_crore"]),
     "fact_sip_inflows": ("04_monthly_sip_inflows.csv", None),
@@ -207,9 +183,6 @@ for table_name, (csv_file, cols) in additional.items():
 
     logger.info("✓ %s loaded (%d rows)", table_name, len(df))
 
-# --------------------------------------------------
-# Verify Row Counts
-# --------------------------------------------------
 logger.info("")
 logger.info("=" * 80)
 logger.info("ROW COUNT VERIFICATION")

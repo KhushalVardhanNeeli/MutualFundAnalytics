@@ -22,9 +22,6 @@ logger.info("=" * 80)
 
 PROCESSED.mkdir(parents=True, exist_ok=True)
 
-# ==================================================
-# 1. CLEAN FUND MASTER (01)
-# ==================================================
 logger.info("Cleaning 01_fund_master.csv ...")
 
 fm = pd.read_csv(RAW / "01_fund_master.csv")
@@ -44,9 +41,6 @@ fm["exit_load_pct"] = pd.to_numeric(fm["exit_load_pct"], errors="coerce")
 fm.to_csv(PROCESSED / "01_fund_master.csv", index=False)
 logger.info("  ✓ Fund master cleaned (%d rows)", len(fm))
 
-# ==================================================
-# 2. CLEAN NAV HISTORY (02)
-# ==================================================
 logger.info("Cleaning 02_nav_history.csv ...")
 
 nav = pd.read_csv(RAW / "02_nav_history.csv")
@@ -59,9 +53,6 @@ nav = nav[nav["nav"] > 0]
 nav.to_csv(PROCESSED / "02_nav_history.csv", index=False)
 logger.info("  ✓ NAV history cleaned (%d rows)", len(nav))
 
-# ==================================================
-# 3. CLEAN AUM BY FUND HOUSE (03)
-# ==================================================
 logger.info("Cleaning 03_aum_by_fund_house.csv ...")
 
 aum = pd.read_csv(RAW / "03_aum_by_fund_house.csv")
@@ -76,9 +67,6 @@ aum = aum[aum["aum_crore"] > 0]
 aum.to_csv(PROCESSED / "03_aum_by_fund_house.csv", index=False)
 logger.info("  ✓ AUM cleaned (%d rows)", len(aum))
 
-# ==================================================
-# 4. CLEAN MONTHLY SIP INFLOWS (04)
-# ==================================================
 logger.info("Cleaning 04_monthly_sip_inflows.csv ...")
 
 sip = pd.read_csv(RAW / "04_monthly_sip_inflows.csv")
@@ -94,9 +82,6 @@ sip["yoy_growth_pct"] = pd.to_numeric(sip["yoy_growth_pct"], errors="coerce")
 sip.to_csv(PROCESSED / "04_monthly_sip_inflows.csv", index=False)
 logger.info("  ✓ SIP inflows cleaned (%d rows)", len(sip))
 
-# ==================================================
-# 5. CLEAN CATEGORY INFLOWS (05)
-# ==================================================
 logger.info("Cleaning 05_category_inflows.csv ...")
 
 cat = pd.read_csv(RAW / "05_category_inflows.csv")
@@ -109,9 +94,6 @@ cat["category"] = cat["category"].astype(str).str.strip()
 cat.to_csv(PROCESSED / "05_category_inflows.csv", index=False)
 logger.info("  ✓ Category inflows cleaned (%d rows)", len(cat))
 
-# ==================================================
-# 6. CLEAN INDUSTRY FOLIO COUNT (06)
-# ==================================================
 logger.info("Cleaning 06_industry_folio_count.csv ...")
 
 folio = pd.read_csv(RAW / "06_industry_folio_count.csv")
@@ -125,9 +107,6 @@ for col in ["total_folios_crore", "equity_folios_crore", "debt_folios_crore",
 folio.to_csv(PROCESSED / "06_industry_folio_count.csv", index=False)
 logger.info("  ✓ Folio count cleaned (%d rows)", len(folio))
 
-# ==================================================
-# 7. CLEAN SCHEME PERFORMANCE (07)
-# ==================================================
 logger.info("Cleaning 07_scheme_performance.csv ...")
 
 perf = pd.read_csv(RAW / "07_scheme_performance.csv")
@@ -146,9 +125,6 @@ perf = perf[(perf["expense_ratio_pct"] >= 0.1) & (perf["expense_ratio_pct"] <= 2
 perf.to_csv(PROCESSED / "07_scheme_performance.csv", index=False)
 logger.info("  ✓ Scheme performance cleaned (%d rows)", len(perf))
 
-# ==================================================
-# 8. CLEAN INVESTOR TRANSACTIONS (08)
-# ==================================================
 logger.info("Cleaning 08_investor_transactions.csv ...")
 
 tx = pd.read_csv(RAW / "08_investor_transactions.csv")
@@ -169,9 +145,6 @@ tx["age_group"] = tx["age_group"].astype(str).str.strip()
 tx.to_csv(PROCESSED / "08_investor_transactions.csv", index=False)
 logger.info("  ✓ Investor transactions cleaned (%d rows)", len(tx))
 
-# ==================================================
-# 9. CLEAN PORTFOLIO HOLDINGS (09)
-# ==================================================
 logger.info("Cleaning 09_portfolio_holdings.csv ...")
 
 pf = pd.read_csv(RAW / "09_portfolio_holdings.csv")
@@ -181,7 +154,6 @@ pf["weight_pct"] = pd.to_numeric(pf["weight_pct"], errors="coerce")
 pf["market_value_cr"] = pd.to_numeric(pf["market_value_cr"], errors="coerce")
 pf["current_price_inr"] = pd.to_numeric(pf["current_price_inr"], errors="coerce")
 
-# Validate weights per fund add up to ~100% within tolerance
 weight_check = pf.groupby("amfi_code")["weight_pct"].sum()
 for code, total in weight_check.items():
     if total < 90 or total > 110:
@@ -190,9 +162,6 @@ for code, total in weight_check.items():
 pf.to_csv(PROCESSED / "09_portfolio_holdings.csv", index=False)
 logger.info("  ✓ Portfolio holdings cleaned (%d rows)", len(pf))
 
-# ==================================================
-# 10. CLEAN BENCHMARK INDICES (10)
-# ==================================================
 logger.info("Cleaning 10_benchmark_indices.csv ...")
 
 bm = pd.read_csv(RAW / "10_benchmark_indices.csv")
@@ -206,15 +175,11 @@ bm["index_name"] = bm["index_name"].astype(str).str.strip().str.upper()
 bm.to_csv(PROCESSED / "10_benchmark_indices.csv", index=False)
 logger.info("  ✓ Benchmark indices cleaned (%d rows)", len(bm))
 
-# ==================================================
-# COMPLETE
-# ==================================================
 logger.info("")
 logger.info("=" * 80)
 logger.info("DATA CLEANING COMPLETED — All 10 datasets processed")
 logger.info("=" * 80)
 
-# Summary of all cleaned files
 for f in sorted(PROCESSED.glob("*.csv")):
     df = pd.read_csv(f)
     logger.info("  %-45s  %5d rows  %2d cols", f.name, len(df), len(df.columns))

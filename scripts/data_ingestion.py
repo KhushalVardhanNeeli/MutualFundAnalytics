@@ -1,10 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
-# Path to raw data
 DATA_FOLDER = Path("data/raw")
 
-# Get all CSV files
 csv_files = sorted(DATA_FOLDER.glob("*.csv"))
 
 print("=" * 80)

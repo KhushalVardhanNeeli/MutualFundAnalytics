@@ -12,7 +12,6 @@ import os
 DB_PATH = Path("data/db/bluestock_mf.db")
 REPORTS_DIR = Path("reports")
 
-# SMTP config (set via env vars, no defaults for security)
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SMTP_USER = os.environ.get("SMTP_USER", "")

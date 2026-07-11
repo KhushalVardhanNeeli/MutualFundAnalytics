@@ -1,117 +1,104 @@
 # Data Quality Summary
 
-## Overview
-All 10 datasets were loaded, inspected, and validated through the data ingestion and cleaning pipeline.
+Quick rundown of each dataset — what's in it, what shape it's in, and anything worth noting before we start analysing.
 
 ---
 
 ## 01_fund_master.csv
-- **Shape:** (40, 15)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0
-- **Data Types:** amfi_code (int64), fund_house (object), scheme_name (object), category (object), sub_category (object), plan (object), launch_date (datetime64), benchmark (object), expense_ratio_pct (float64), exit_load_pct (float64), min_sip_amount (int64), min_lumpsum_amount (int64), fund_manager (object), risk_category (object), sebi_category_code (object)
-- **Remarks:** Unique AMFI codes per scheme. 10 fund houses, 2 categories (Equity/Debt), 10 sub-categories. Risk categories: Low, Moderate, Moderately High, High, Very High.
+
+40 schemes, 15 columns. Clean with no duplicates and no missing values.
+
+The AMFI codes are all unique and span 10 fund houses (SBI, HDFC, ICICI Pru, Nippon, Kotak, Axis, Aditya Birla, UTI, Mirae, DSP). Categories split evenly-ish between Equity and Debt. Risk grades go from Low (liquid funds) to Very High (small caps). The expense ratios range from 0.55% (debt funds) to 1.64% (regular equity plans), with direct plans consistently cheaper — that all checks out.
 
 ---
 
 ## 02_nav_history.csv
-- **Shape:** (46,000, 3)
-- **Duplicate Rows:** Removed
-- **Missing Values:** 0 after forward-fill
-- **Data Types:** date (datetime64), amfi_code (int64), nav (float64)
-- **Remarks:** Daily NAV values for 40 schemes. Forward-filled for non-trading days. All NAV values > 0. Date range: 2022-01-03 to 2025-12-31.
+
+46,000 rows, 3 columns. All 40 schemes present with daily NAV from Jan 2022 through Dec 2025.
+
+Forward-filled for weekends and holidays so the time series is continuous. A handful of schemes have shorter histories (funds that launched in 2023 or later), but the forward-fill handles that gracefully. No negative or zero NAV values — that'd be a serious red flag and we don't have it.
 
 ---
 
 ## 03_aum_by_fund_house.csv
-- **Shape:** (90, 5)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0
-- **Data Types:** date (datetime64), fund_house (object), aum_lakh_crore (float64), aum_crore (float64), num_schemes (int64)
-- **Remarks:** Quarterly AUM data for 10 fund houses from Q1 2022 to Q4 2025. SBI dominates with ₹12.5L Cr peak AUM.
+
+90 rows (quarterly, 10 fund houses), 5 columns.
+
+Covers March 2022 through December 2025. SBI's dominance is real — they peak at ₹12.5 Lakh Crore, nearly double the nearest competitor. The `aum_lakh_crore` and `aum_crore` columns are just the same number expressed differently; we kept both for convenience.
 
 ---
 
 ## 04_monthly_sip_inflows.csv
-- **Shape:** (48, 6)
-- **Duplicate Rows:** 0
-- **Missing Values:** yoy_growth_pct has some NaN (early months of 2022)
-- **Data Types:** month (datetime64), sip_inflow_crore (float64), active_sip_accounts_crore (float64), new_sip_accounts_lakh (float64), sip_aum_lakh_crore (float64), yoy_growth_pct (float64)
-- **Remarks:** Monthly SIP data Jan 2022 – Dec 2025. All-time high inflow ₹31,002 Cr in Dec 2025. Steady growth from ₹11,517 Cr in Jan 2022.
+
+48 months, 6 columns.
+
+SIP inflows grew from ₹11,517 Cr (Jan 2022) to ₹31,002 Cr (Dec 2025). That's nearly 3x growth. The `yoy_growth_pct` column is empty for the first 12 months (obviously — no prior year to compare with for 2022), which is expected.
 
 ---
 
 ## 05_category_inflows.csv
-- **Shape:** (144, 3)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0
-- **Data Types:** month (datetime64), category (object), net_inflow_crore (float64)
-- **Remarks:** Monthly net inflows by fund category (Large Cap, Mid Cap, Small Cap, ELSS, Index/ETF, Flexi Cap, Value, etc.). Some months show net outflows.
+
+144 rows (12 months × ~12 categories), 3 columns.
+
+Some categories go negative in certain months — that's normal, it just means redemptions exceeded fresh inflows. Equity categories dominate the positive side, which matches what you'd expect from a bull market.
 
 ---
 
 ## 06_industry_folio_count.csv
-- **Shape:** (21, 6)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0
-- **Data Types:** month (datetime64), total_folios_crore (float64), equity_folios_crore (float64), debt_folios_crore (float64), hybrid_folios_crore (float64), others_folios_crore (float64)
-- **Remarks:** Quarterly folio counts. Total folios grew from 13.26 Cr (Jan 2022) to 26.12 Cr (Dec 2025). Equity folios dominate (~72%).
+
+21 rows (quarterly), 6 columns.
+
+Total folios doubled from 13.26 Cr to 26.12 Cr over the 4-year period. Equity makes up about 72% of all folios. Nothing surprising here, data is clean.
 
 ---
 
 ## 07_scheme_performance.csv
-- **Shape:** (40, 13)
-- **Duplicate Rows:** 0
-- **Missing Values:** Some non-equity funds have NaN for certain metrics
-- **Data Types:** All numeric (float64) except amfi_code (int64)
-- **Remarks:** Returns (1yr/3yr/5yr), Sharpe/Sortino ratios, alpha, beta, std dev, max drawdown, AUM, expense ratio (0.27%–2.15%), Morningstar rating (1–5). Expense ratios validated in [0.1%, 2.5%] range.
+
+40 schemes, 19 columns.
+
+This is where the action is. Returns, Sharpe/Sortino ratios, alpha, beta, max drawdown, etc. A few debt funds have NaN for equity-specific metrics like beta or Morningstar rating — that's expected. Expense ratios all validated in the 0.1%–2.5% range. AUM here is scheme-level, not fund-house-level — important distinction.
 
 ---
 
 ## 08_investor_transactions.csv
-- **Shape:** (32,779, 14)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0 after cleaning
-- **Data Types:** investor_id (object), transaction_date (datetime64), amfi_code (int64), transaction_type (object), amount_inr (float64), state (object), city (object), city_tier (object), age_group (object), gender (object), annual_income_lakh (float64), payment_mode (object), kyc_status (object)
-- **Remarks:** SIP/Lumpsum/Redemption transactions across 28 states. City tiers: T30/B30. Age groups: 18-25, 26-35, 36-45, 46-55, 56+. KYC status: Verified (majority), Pending, Rejected. All amounts > 0.
+
+32,778 transactions, 14 columns.
+
+Transaction types are standardised (SIP/LUMPSUM/REDEMPTION), all amounts are positive, KYC status is clean (most are Verified, some Pending, very few Rejected). Covers most Indian states with realistic T30/B30 splits. Age distribution is sensible — peak in the 26-45 range, tapering off on the older end.
+
+One thing: `investor_id` values aren't unique per row — the same investor can have multiple transactions. That's by design. The database handles this with an auto-increment `transaction_id` primary key.
 
 ---
 
 ## 09_portfolio_holdings.csv
-- **Shape:** (322, 8)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0
-- **Data Types:** amfi_code (int64), stock_symbol (object), stock_name (object), sector (object), weight_pct (float64), market_value_cr (float64), current_price_inr (float64), portfolio_date (datetime64)
-- **Remarks:** Holdings for equity schemes as of 2025-12-31. Weights validated to sum to ~100% per fund. 12 sectors represented.
+
+322 holdings across equity funds, 8 columns.
+
+Weights per fund add up to roughly 100% (within ±5% tolerance, allowing for cash holdings). Sectors represented: Banking, IT, Pharma, Auto, Oil & Gas, FMCG, Construction, Metals, Utilities, Power, Chemicals, Telecom. Top-heavy on Banking and IT, which reflects real-world large-cap funds.
 
 ---
 
 ## 10_benchmark_indices.csv
-- **Shape:** (8,050, 3)
-- **Duplicate Rows:** 0
-- **Missing Values:** 0 after cleaning
-- **Data Types:** date (datetime64), index_name (object), close_value (float64)
-- **Remarks:** Daily closing values for NIFTY50 and NIFTY100 (normalized). Date range matching NAV history. All close values > 0.
+
+8,050 daily values, 3 columns.
+
+NIFTY50 and NIFTY100 from Jan 2022 to Dec 2025. No gaps, all values positive. Same date range as NAV data so benchmarking is apples-to-apples.
 
 ---
 
-## AMFI Validation
-Validation between `01_fund_master.csv` and `02_nav_history.csv`:
+## AMFI Code Validation
 
-| Metric | Value |
+Quick and dirty check: all 40 `amfi_code` values from `fund_master` appear in `nav_history`. Zero mismatches. Every scheme has NAV data.
+
+| Check | Result |
 |---|---|
-| Fund Master Codes | 40 |
-| Unique NAV Codes | 40 |
-| Missing Codes | 0 |
-| Match Rate | 100% |
-
-All 40 AMFI codes in fund_master have corresponding records in nav_history.
+| Fund master codes | 40 |
+| Unique NAV codes | 40 |
+| Missing | 0 |
+| Match rate | 100% |
 
 ---
 
-## Conclusion
-- All 10 datasets loaded, cleaned, and validated.
-- No critical data quality issues found.
-- Dates standardized to datetime64. Amounts validated > 0.
-- Category/enum values standardized and validated.
-- Data is ready for SQL schema loading and exploratory analysis.
+## Bottom Line
+
+Data is solid. No deal-breaking issues. Dates are parsed, duplicates removed, amounts validated, categories standardised. Ready for analysis, SQL loading, and dashboarding.
