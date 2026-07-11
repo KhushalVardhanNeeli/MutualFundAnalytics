@@ -2,6 +2,7 @@
 *.db
 *.sqlite
 *.sqlite3
+data/db/*.db
 
 # Python
 __pycache__/

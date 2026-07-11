@@ -12,7 +12,7 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
-DB_PATH = PROJECT_ROOT / "bluestock_mf.db"
+DB_PATH = PROJECT_ROOT / "data" / "db" / "bluestock_mf.db"
 
 
 class TestDataRaw(unittest.TestCase):

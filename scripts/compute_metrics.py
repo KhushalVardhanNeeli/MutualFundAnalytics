@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-DB_PATH = Path("bluestock_mf.db")
+DB_PATH = Path("data/db/bluestock_mf.db")
 
 
 def _get_connection():

@@ -19,7 +19,7 @@ st.set_page_config(
 
 # ────────── Constants / Paths ──────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "bluestock_mf.db"
+DB_PATH = BASE_DIR / "data" / "db" / "bluestock_mf.db"
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
 BLUESTOCK_BLUE = "#1F4E79"

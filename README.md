@@ -12,9 +12,11 @@ bluestock_mf_capstone/
 ├── data/
 │   ├── raw/              ← Original downloaded CSV files (10 datasets)
 │   ├── raw/api/          ← Live NAV data fetched from MFAPI
-│   └── processed/        ← Cleaned datasets ready for analysis
+│   ├── processed/        ← Cleaned datasets ready for analysis
+│   └── db/               ← bluestock_mf.db (SQLite database)
 ├── scripts/
 │   ├── config.py         ← Shared configuration (paths, codes, constants)
+│   ├── etl_pipeline.py   ← Master pipeline runner (all steps)
 │   ├── data_ingestion.py ← Load and explore all 10 raw CSVs
 │   ├── validate_amfi.py  ← Validate AMFI codes between datasets
 │   ├── explore_fund_master.py ← Fund master exploration
@@ -23,6 +25,7 @@ bluestock_mf_capstone/
 │   ├── data_cleaning.py  ← Clean all 10 datasets
 │   ├── load_to_sqlite.py ← Load cleaned data into SQLite star schema
 │   ├── compute_metrics.py     ← VaR/CVaR, HHI, rolling Sharpe
+│   ├── recommender.py         ← Fund recommender by risk appetite
 │   ├── monte_carlo_nav.py     ← Monte Carlo NAV projection (5 years)
 │   ├── markowitz_efficient_frontier.py ← Efficient Frontier optimisation
 │   └── email_report_generator.py      ← Weekly HTML email reports
@@ -30,9 +33,11 @@ bluestock_mf_capstone/
 │   ├── schema.sql        ← Database star schema (dim + fact tables)
 │   └── queries.sql       ← 15 analytical SQL queries
 ├── notebooks/
-│   ├── EDA_Analysis.ipynb           ← Exploratory Data Analysis (15+ charts)
-│   ├── Performance_Analytics.ipynb  ← CAGR, Sharpe, Alpha/Beta, Scorecard
-│   └── 05_advanced_analytics.ipynb  ← VaR, Cohorts, Recommender, HHI
+│   ├── 01_data_ingestion.ipynb         ← Load & explore all 10 raw CSVs
+│   ├── 02_data_cleaning.ipynb          ← Clean & validate datasets
+│   ├── 03_eda_analysis.ipynb           ← Exploratory Data Analysis (15+ charts)
+│   ├── 04_performance_analytics.ipynb  ← CAGR, Sharpe, Alpha/Beta, Scorecard
+│   └── 05_advanced_analytics.ipynb     ← VaR, Cohorts, Recommender, HHI
 ├── dashboard/
 │   ├── bluestock_mf.pbix        ← Power BI 4-page dashboard
 │   └── streamlit_app.py        ← Streamlit web app alternative
@@ -128,8 +133,8 @@ streamlit run dashboard/streamlit_app.py
 |---|---|---|---|
 | D1 | ETL Pipeline | scripts/*.py | Done |
 | D2 | SQLite Database | bluestock_mf.db | Done |
-| D3 | EDA Notebook | notebooks/EDA_Analysis.ipynb | Done |
-| D4 | Performance Metrics | notebooks/Performance_Analytics.ipynb | Done |
+| D3 | EDA Notebook | notebooks/03_eda_analysis.ipynb | Done |
+| D4 | Performance Metrics | notebooks/04_performance_analytics.ipynb | Done |
 | D5 | Interactive Dashboard | dashboard/ | Done |
 | D6 | Advanced Analytics | notebooks/05_advanced_analytics.ipynb | Done |
 | D7 | Final Report + Slides | reports/ | Done |

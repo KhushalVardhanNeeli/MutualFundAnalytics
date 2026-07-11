@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 
 
-DB_PATH = Path("bluestock_mf.db")
+DB_PATH = Path("data/db/bluestock_mf.db")
 CHARTS_DIR = Path("charts")
 OUTPUT = CHARTS_DIR / "efficient_frontier.png"
 

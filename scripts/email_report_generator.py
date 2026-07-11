@@ -9,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import os
 
-DB_PATH = Path("bluestock_mf.db")
+DB_PATH = Path("data/db/bluestock_mf.db")
 REPORTS_DIR = Path("reports")
 
 # SMTP config (set via env vars, no defaults for security)

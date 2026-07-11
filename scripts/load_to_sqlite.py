@@ -23,6 +23,7 @@ logger.info("=" * 80)
 engine = None
 try:
     from sqlalchemy import create_engine, text
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{DB_PATH}")
     logger.info("Using SQLAlchemy engine")
 except ImportError:
